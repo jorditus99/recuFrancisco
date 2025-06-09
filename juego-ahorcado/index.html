@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>El Penjat - Volta al món</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    .letra {
+      display: inline-block;
+      margin: 5px;
+      padding: 10px;
+      background-color: #f8f9fa;
+      border: 1px solid #ced4da;
+      border-radius: 5px;
+      cursor: grab;
+    }
+    .letra.usada {
+      background-color: #dee2e6;
+      cursor: not-allowed;
+    }
+    .mascara span {
+      display: inline-block;
+      width: 40px;
+      height: 50px;
+      border-bottom: 2px solid black;
+      margin: 0 5px;
+      font-size: 24px;
+      text-align: center;
+      line-height: 50px;
+    }
+    #zona-letras {
+      min-height: 60px;
+      border: 2px dashed #6c757d;
+      padding: 10px;
+    }
+    #dibujo-penjat {
+      min-height: 150px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container mt-5">
+    <!-- Pantalla de inicio -->
+    <div id="pantalla-inicio" class="card mx-auto" style="max-width: 400px;">
+      <div class="card-body">
+        <h5 class="card-title text-center">Benvingut al joc del penjat!</h5>
+        <p class="card-text text-center">Introdueix el teu nom per començar:</p>
+        <input type="text" id="nom-usuari" class="form-control" placeholder="Nom">
+        <button id="boton-comenzar" class="btn btn-primary w-100 mt-3">Començar</button>
+      </div>
+    </div>
+
+    <!-- Zona de joc -->
+    <div id="zona-joc" class="mt-4" style="display: none;">
+      <div class="mb-3">
+        <h5>Hola, <span id="usuari-nom"></span>! Categoria: <span id="categoria"></span></h5>
+      </div>
+
+      <div class="mascara mb-4" id="mascara"></div>
+      <div class="mb-3">Arrossega una lletra fins a la paraula:</div>
+      <div id="zona-letras" class="mb-4" ondrop="soltarLetra(event)" ondragover="permitirSoltar(event)"></div>
+
+      <div id="letras-disponibles" class="mb-4"></div>
+      <div id="dibujo-penjat" class="mb-4"></div>
+      <div id="final-joc" class="alert alert-info d-none"></div>
+      <button class="btn btn-success d-none" id="boton-reiniciar">Tornar a jugar</button>
+    </div>
+  </div>
+
+  <script>
+    const paraules = [
+      // EUROPA
+      { categoria: 'Europa', paraula: 'paris', info: 'Capital de Francia, conocida como la Ciudad de la Luz y hogar de la Torre Eiffel.' },
+      { categoria: 'Europa', paraula: 'roma', info: 'Capital de Italia, ciudad eterna con el famoso Coliseo y el Vaticano.' },
+      { categoria: 'Europa', paraula: 'londres', info: 'Capital del Reino Unido, hogar del Big Ben y el Palacio de Buckingham.' },
+      { categoria: 'Europa', paraula: 'berlin', info: 'Capital de Alemania, ciudad histórica con el famoso Muro de Berlín.' },
+      { categoria: 'Europa', paraula: 'madrid', info: 'Capital de España, conocida por el Museo del Prado y la Puerta del Sol.' },
+      { categoria: 'Europa', paraula: 'amsterdam', info: 'Capital de los Países Bajos, famosa por sus canales y bicicletas.' },
+      { categoria: 'Europa', paraula: 'viena', info: 'Capital de Austria, ciudad de la música clásica y la arquitectura barroca.' },
+      { categoria: 'Europa', paraula: 'praga', info: 'Capital de República Checa, con su famoso Puente de Carlos y su reloj astronómico.' },
+      { categoria: 'Europa', paraula: 'lisboa', info: 'Capital de Portugal, conocida por sus tranvías amarillos y el bacalao.' },
+      { categoria: 'Europa', paraula: 'atenas', info: 'Capital de Grecia, cuna de la democracia y hogar del Partenón.' },
+
+      // ASIA
+      { categoria: 'Asia', paraula: 'tokio', info: 'Capital de Japón, metrópolis moderna con templos antiguos.' },
+      { categoria: 'Asia', paraula: 'pekin', info: 'Capital de China, hogar de la Ciudad Prohibida y cerca de la Gran Muralla.' },
+      { categoria: 'Asia', paraula: 'seul', info: 'Capital de Corea del Sur, famosa por su tecnología y K-pop.' },
+      { categoria: 'Asia', paraula: 'bangkok', info: 'Capital de Tailandia, conocida por sus templos y comida callejera.' },
+      { categoria: 'Asia', paraula: 'dubai', info: 'Ciudad de los Emiratos Árabes Unidos, famosa por sus rascacielos.' },
+      { categoria: 'Asia', paraula: 'mumbai', info: 'Ciudad más poblada de India, centro del cine de Bollywood.' },
+      { categoria: 'Asia', paraula: 'singapur', info: 'Ciudad-estado moderna conocida por su limpieza y orden.' },
+      { categoria: 'Asia', paraula: 'hanoi', info: 'Capital de Vietnam, famosa por su comida y cultura milenaria.' },
+      { categoria: 'Asia', paraula: 'taipei', info: 'Capital de Taiwán, conocida por su torre 101 y mercados nocturnos.' },
+      { categoria: 'Asia', paraula: 'manila', info: 'Capital de Filipinas, mezcla de culturas asiática y española.' },
+
+      // AMÉRICA
+      { categoria: 'América', paraula: 'toronto', info: 'Ciudad más grande de Canadá, con la famosa Torre CN.' },
+      { categoria: 'América', paraula: 'lima', info: 'Capital de Perú, famosa por su gastronomía y sitios arqueológicos.' },
+      { categoria: 'América', paraula: 'mexico', info: 'Capital de México, ciudad con gran historia azteca.' },
+      { categoria: 'América', paraula: 'chicago', info: 'Ciudad de EE.UU. conocida por su arquitectura y pizza deep dish.' },
+      { categoria: 'América', paraula: 'bogota', info: 'Capital de Colombia, situada en los Andes a gran altura.' },
+      { categoria: 'América', paraula: 'santiago', info: 'Capital de Chile, rodeada por la Cordillera de los Andes.' },
+      { categoria: 'América', paraula: 'havana', info: 'Capital de Cuba, famosa por su música y arquitectura colonial.' },
+      { categoria: 'América', paraula: 'rio', info: 'Ciudad de Brasil con el Cristo Redentor y playas famosas.' },
+      { categoria: 'América', paraula: 'quito', info: 'Capital de Ecuador, primera ciudad declarada Patrimonio Cultural.' },
+      { categoria: 'América', paraula: 'panama', info: 'Capital de Panamá, conocida por su canal interoceánico.' },
+
+     
+    ];
+
+    const abecedari = 'abcdefghijklmnopqrstuvwxyz';
+    let paraulaActual = '';
+    let mascara = [];
+    let errors = 0;
+    let maxErrors = 6;
+    let lletresUtilitzades = [];
+    let infoActual = '';
+
+    const pantallaInicio = document.getElementById('pantalla-inicio');
+    const zonaJoc = document.getElementById('zona-joc');
+    const mascaraEl = document.getElementById('mascara');
+    const letrasDisponibles = document.getElementById('letras-disponibles');
+    const zonaLetras = document.getElementById('zona-letras');
+    const dibujoPenjat = document.getElementById('dibujo-penjat');
+    const finalJoc = document.getElementById('final-joc');
+    const botonReiniciar = document.getElementById('boton-reiniciar');
+    const categoriaEl = document.getElementById('categoria');
+    const usuariNomEl = document.getElementById('usuari-nom');
+
+    document.getElementById('boton-comenzar').addEventListener('click', () => {
+      const nom = document.getElementById('nom-usuari').value.trim();
+      if (nom) {
+        usuariNomEl.textContent = nom;
+        pantallaInicio.style.display = 'none';
+        zonaJoc.style.display = 'block';
+        iniciarJoc();
+      }
+    });
+
+    function iniciarJoc() {
+      const aleatoria = paraules[Math.floor(Math.random() * paraules.length)];
+      paraulaActual = aleatoria.paraula;
+      infoActual = aleatoria.info;
+      categoriaEl.textContent = aleatoria.categoria;
+      mascara = Array(paraulaActual.length).fill('');
+      errors = 0;
+      lletresUtilitzades = [];
+      dibujarMascara();
+      generarLletres();
+      actualizarPenjat();
+      finalJoc.classList.add('d-none');
+      botonReiniciar.classList.add('d-none');
+      guardarEstat();
+    }
+
+    function dibujarMascara() {
+      mascaraEl.innerHTML = '';
+      mascara.forEach(l => {
+        const span = document.createElement('span');
+        span.textContent = l || '';
+        mascaraEl.appendChild(span);
+      });
+    }
+
+    function generarLletres() {
+      letrasDisponibles.innerHTML = '';
+      for (let lletra of abecedari) {
+        const div = document.createElement('div');
+        div.textContent = lletra.toUpperCase();
+        div.className = 'letra';
+        div.setAttribute('draggable', true);
+        div.setAttribute('id', 'letra-' + lletra);
+        div.addEventListener('dragstart', arrastrarLetra);
+        if (lletresUtilitzades.includes(lletra)) {
+          div.classList.add('usada');
+          div.setAttribute('draggable', false);
+        }
+        letrasDisponibles.appendChild(div);
+      }
+    }
+
+    function arrastrarLetra(event) {
+      event.dataTransfer.setData('text/plain', event.target.textContent.toLowerCase());
+    }
+
+    function permitirSoltar(event) {
+      event.preventDefault();
+    }
+
+    function soltarLetra(event) {
+      event.preventDefault();
+      const lletra = event.dataTransfer.getData('text/plain');
+      if (!lletresUtilitzades.includes(lletra)) {
+        lletresUtilitzades.push(lletra);
+        comprovarLletra(lletra);
+        generarLletres();
+        dibujarMascara();
+        actualizarPenjat();
+        comprobarFinal();
+        guardarEstat();
+      }
+    }
+
+    function comprovarLletra(lletra) {
+      let acertat = false;
+      paraulaActual.split('').forEach((l, i) => {
+        if (l === lletra) {
+          mascara[i] = lletra.toUpperCase();
+          acertat = true;
+        }
+      });
+      if (!acertat) errors++;
+    }
+
+    function actualizarPenjat() {
+      dibujoPenjat.innerHTML = `<img src="imagenes/ahorcado${errors}.png" alt="Ahorcado" style="max-width: 200px;"><br>Errors: ${errors} de ${maxErrors}`;
+    }
+
+    function comprobarFinal() {
+      if (mascara.join('').toLowerCase() === paraulaActual) {
+        finalJoc.textContent = `Molt bé! Has encertat la paraula: ${paraulaActual.toUpperCase()}. ${infoActual}`;
+        finalJoc.classList.remove('d-none');
+        botonReiniciar.classList.remove('d-none');
+      } else if (errors >= maxErrors) {
+        finalJoc.textContent = `Oh no! Has perdut. La paraula era: ${paraulaActual.toUpperCase()}. ${infoActual}`;
+        finalJoc.classList.remove('d-none');
+        botonReiniciar.classList.remove('d-none');
+      }
+    }
+
+    botonReiniciar.addEventListener('click', iniciarJoc);
+
+    function guardarEstat() {
+      const estat = {
+        paraula: paraulaActual,
+        mascara,
+        errors,
+        lletresUtilitzades,
+        categoria: categoriaEl.textContent,
+        info: infoActual,
+        usuari: usuariNomEl.textContent
+      };
+      localStorage.setItem('estatPenjat', JSON.stringify(estat));
+    }
+
+    function carregarEstat() {
+      const estat = JSON.parse(localStorage.getItem('estatPenjat'));
+      if (estat) {
+        paraulaActual = estat.paraula;
+        mascara = estat.mascara;
+        errors = estat.errors;
+        lletresUtilitzades = estat.lletresUtilitzades;
+        categoriaEl.textContent = estat.categoria;
+        infoActual = estat.info;
+        usuariNomEl.textContent = estat.usuari;
+        pantallaInicio.style.display = 'none';
+        zonaJoc.style.display = 'block';
+        dibujarMascara();
+        generarLletres();
+        actualizarPenjat();
+        comprobarFinal();
+      }
+    }
+
+    window.onload = carregarEstat;
+  </script>
+</body>
+</html>
