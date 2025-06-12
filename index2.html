@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <!-- Meta tags básicos para asegurar que la página se vea bien en todos los dispositivos -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Enlazamos Bootstrap para tener estilos predefinidos y hacer el diseño más fácil -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+    
+    <title>El Penjat</title>
+
+    <!-- Aquí irán nuestros estilos CSS personalizados -->
+    <style>
+        /* Variables CSS */
+        :root {
+            --color-primary: #0d6efd;
+            --color-error: #dc3545;
+            --color-success: #198754;
+            --color-background: #f8f9fa;
+            --color-border: #dee2e6;
+            --spacing-unit: 1rem;
+        }
+
+        /* Estilos del teclado */
+        .teclado {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            justify-content: center;
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .tecla {
+            width: 40px;
+            height: 40px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: grab;
+            background-color: white;
+            transition: all 0.2s;
+            user-select: none;
+        }
+
+        .tecla:hover {
+            background-color: #e9ecef;
+        }
+
+        .tecla.usada {
+            background-color: #dee2e6;
+            cursor: not-allowed;
+            color: #6c757d;
+        }
+
+        .tecla.arrastrando {
+            opacity: 0.5;
+            cursor: grabbing;
+        }
+
+        /* Estilos de la zona de palabra */
+        #zona-palabra {
+            min-height: 100px;
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            margin: 20px 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .letra-espacio {
+            width: 40px;
+            height: 50px;
+            border-bottom: 2px solid #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        /* Estilos del ahorcado */
+        #dibujo-ahorcado {
+            text-align: center;
+            margin: 20px 0;
+            min-height: 200px;
+        }
+
+        #dibujo-ahorcado img {
+            max-width: 200px;
+            height: auto;
+        }
+
+        .contador-errores {
+            text-align: center;
+            font-size: 1.2em;
+            color: #dc3545;
+            margin-top: 10px;
+        }
+
+        /* Estilos de mensajes */
+        .mensaje-final {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.2);
+            z-index: 1000;
+            text-align: center;
+            display: none;
+        }
+
+        .mensaje-final.visible {
+            display: block;
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0,0,0,0.5);
+            display: none;
+            z-index: 999;
+        }
+
+        .overlay.visible {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <!-- Overlay para el fondo oscuro -->
+    <div class="overlay" id="overlay"></div>
+
+    <!-- Mensaje final -->
+    <div class="mensaje-final" id="mensaje-final">
+        <h3 id="mensaje-titulo"></h3>
+        <p id="mensaje-texto"></p>
+        <button class="btn btn-primary mt-3" id="boton-continuar">Continuar</button>
+    </div>
+
+    <!-- Container de Bootstrap para centrar el contenido y dar márgenes -->
+    <div class="container mt-5">
+        <!-- Card inicial -->
+        <div class="card" id="tarjeta-inicio">
+            <div class="card-body">
+                <h5 class="card-title" id="titulo-juego">El Penjat</h5>
+                <input type="text" class="form-control" id="nombre-jugador" placeholder="Tu nombre">
+                <button class="btn btn-primary mt-3" id="boton-empezar">Empezar</button>
+            </div>
+        </div>
+
+        <!-- Card del juego (inicialmente oculta) -->
+        <div class="card" id="tarjeta-juego" style="display: none;">
+            <div class="card-body">
+                <h5 class="card-title">El Penjat</h5>
+                <p id="categoria-juego">Categoría: <span id="categoria-actual"></span></p>
+                <div id="dibujo-ahorcado">
+                    <img src="juego-ahorcado/imagenes/ahorcado0.png" alt="Estado del ahorcado" id="imagen-ahorcado">
+                    <div class="contador-errores">Errores: <span id="contador-errores">0</span>/5</div>
+                </div>
+                <div id="zona-palabra"></div>
+                <div id="teclado" class="teclado"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Variables globales
+        let palabraActual = '';
+        let mascara = [];
+        let letrasUsadas = [];
+        let errores = 0;
+        const maxErrores = 5;
+        let infoActual = '';
+
+        // Función para obtener palabra aleatoria
+        function palabraAleatoria() {
+            const palabras = [
+                { categoria: 'Europa', palabra: 'paris', info: 'Capital de Francia' },
+                { categoria: 'Europa', palabra: 'roma', info: 'Capital de Italia' },
+                { categoria: 'Europa', palabra: 'madrid', info: 'Capital de España' },
+                { categoria: 'Asia', palabra: 'tokio', info: 'Capital de Japón' },
+                { categoria: 'Asia', palabra: 'pekin', info: 'Capital de China' },
+                { categoria: 'América', palabra: 'mexico', info: 'Capital de México' },
+                { categoria: 'América', palabra: 'lima', info: 'Capital de Perú' }
+            ];
+            const random = Math.floor(Math.random() * palabras.length);
+            return palabras[random];
+        }
+
+        // Función para crear la máscara
+        function crearMascara(palabra) {
+            return '_ '.repeat(palabra.length);
+        }
+
+        // Función para dibujar la máscara
+        function dibujarMascara() {
+            const mascaraEl = document.getElementById('mascara-palabra');
+            mascaraEl.innerHTML = '';
+            mascara.forEach(letra => {
+                const span = document.createElement('span');
+                span.textContent = letra || '_';
+                span.style.marginRight = '10px';
+                mascaraEl.appendChild(span);
+            });
+        }
+
+        // Función para crear el teclado
+        function crearTeclado() {
+            const teclado = document.getElementById('teclado');
+            teclado.innerHTML = '';
+            
+            'ABCDEFGHIJKLMNÑOPQRSTUVWXYZ'.split('').forEach(letra => {
+                const boton = document.createElement('div');
+                boton.className = 'tecla';
+                boton.textContent = letra;
+                boton.id = `tecla-${letra}`;
+                boton.draggable = true;
+                
+                // Eventos de arrastre
+                boton.addEventListener('dragstart', (e) => {
+                    if (!letrasUsadas.includes(letra)) {
+                        e.dataTransfer.setData('text/plain', letra);
+                        boton.classList.add('arrastrando');
+                    } else {
+                        e.preventDefault();
+                    }
+                });
+
+                boton.addEventListener('dragend', () => {
+                    boton.classList.remove('arrastrando');
+                });
+
+                boton.addEventListener('click', (e) => {
+                    e.preventDefault(); // Previene el click normal
+                });
+                
+                teclado.appendChild(boton);
+            });
+        }
+
+        // Función para crear la zona de la palabra
+        function crearZonaPalabra() {
+            const zonaPalabra = document.getElementById('zona-palabra');
+            zonaPalabra.innerHTML = '';
+            
+            // Crear los espacios para cada letra
+            for (let i = 0; i < palabraActual.length; i++) {
+                const espacio = document.createElement('div');
+                espacio.className = 'letra-espacio';
+                espacio.id = `espacio-${i}`;
+                espacio.textContent = mascara[i] || '';
+                zonaPalabra.appendChild(espacio);
+            }
+
+            // Añadir eventos de soltar
+            zonaPalabra.addEventListener('dragover', (e) => {
+                e.preventDefault();
+            });
+
+            zonaPalabra.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const letra = e.dataTransfer.getData('text/plain');
+                if (!letrasUsadas.includes(letra)) {
+                    comprobarLetra(letra);
+                }
+            });
+        }
+
+        // Función para guardar el estado del juego
+        function guardarEstadoJuego() {
+            const estadoJuego = {
+                palabraActual,
+                mascara,
+                letrasUsadas,
+                errores,
+                categoria: document.getElementById('categoria-actual').textContent,
+                info: infoActual
+            };
+            localStorage.setItem('estadoPenjat', JSON.stringify(estadoJuego));
+        }
+
+        // Función para cargar el estado del juego
+        function cargarEstadoJuego() {
+            const estadoGuardado = localStorage.getItem('estadoPenjat');
+            if (estadoGuardado) {
+                const estado = JSON.parse(estadoGuardado);
+                palabraActual = estado.palabraActual;
+                mascara = estado.mascara;
+                letrasUsadas = estado.letrasUsadas;
+                errores = estado.errores;
+                infoActual = estado.info;
+                
+                // Actualizar la interfaz
+                document.getElementById('categoria-actual').textContent = estado.categoria;
+                document.getElementById('tarjeta-inicio').style.display = 'none';
+                document.getElementById('tarjeta-juego').style.display = 'block';
+                
+                actualizarAhorcado();
+                crearTeclado();
+                crearZonaPalabra();
+                return true;
+            }
+            return false;
+        }
+
+        // Función para limpiar el estado guardado
+        function limpiarEstadoJuego() {
+            localStorage.removeItem('estadoPenjat');
+        }
+
+        // Función para mostrar mensaje final
+        function mostrarMensajeFinal(ganado) {
+            const mensajeFinal = document.getElementById('mensaje-final');
+            const overlay = document.getElementById('overlay');
+            const titulo = document.getElementById('mensaje-titulo');
+            const texto = document.getElementById('mensaje-texto');
+
+            mensajeFinal.classList.add('visible');
+            overlay.classList.add('visible');
+
+            if (ganado) {
+                titulo.textContent = '¡Felicidades!';
+                texto.textContent = `¡Has adivinado la palabra ${palabraActual.toUpperCase()}!`;
+                // Limpiar el estado al ganar
+                limpiarEstadoJuego();
+            } else {
+                titulo.textContent = '¡Has perdido!';
+                texto.textContent = `La palabra era ${palabraActual.toUpperCase()}. ${infoActual}`;
+                // Limpiar el estado al perder
+                limpiarEstadoJuego();
+            }
+        }
+
+    
+
+        // Función para actualizar el dibujo del ahorcado
+        function actualizarAhorcado() {
+            const imagen = document.getElementById('imagen-ahorcado');
+            const contador = document.getElementById('contador-errores');
+            
+            imagen.src = `juego-ahorcado/imagenes/ahorcado${errores}.png`;
+            contador.textContent = errores;
+
+            if (errores >= maxErrores) {
+                mostrarMensajeFinal(false);
+            }
+        }
+
+        // Función para verificar si se ha ganado
+        function verificarVictoria() {
+            if (mascara.join('').toLowerCase() === palabraActual) {
+                mostrarMensajeFinal(true);
+            }
+        }
+
+        // Función para reiniciar el juego
+        function reiniciarJuego() {
+            const palabraRandom = palabraAleatoria();
+            palabraActual = palabraRandom.palabra;
+            infoActual = palabraRandom.info;
+            mascara = Array(palabraActual.length).fill('');
+            letrasUsadas = [];
+            errores = 0;
+            
+            document.getElementById('categoria-actual').textContent = palabraRandom.categoria;
+            actualizarAhorcado();
+            crearTeclado();
+            crearZonaPalabra();
+            
+            // Guardar el nuevo estado
+            guardarEstadoJuego();
+        }
+
+        // Modificar la función comprobarLetra para guardar el estado
+        function comprobarLetra(letra) {
+            let acertado = false;
+            const letraMinuscula = letra.toLowerCase();
+            
+            palabraActual.split('').forEach((l, i) => {
+                if (l === letraMinuscula) {
+                    mascara[i] = letra;
+                    document.getElementById(`espacio-${i}`).textContent = letra;
+                    acertado = true;
+                }
+            });
+            
+            if (!acertado) {
+                errores++;
+                actualizarAhorcado();
+            }
+
+            letrasUsadas.push(letra);
+            document.getElementById(`tecla-${letra}`).classList.add('usada');
+            
+            // Guardar el estado después de cada jugada
+            guardarEstadoJuego();
+
+            verificarVictoria();
+        }
+
+        // Modificar el evento del botón de continuar
+        document.getElementById('boton-continuar').addEventListener('click', function() {
+            ocultarMensajeFinal();
+            reiniciarJuego();
+        });
+
+        // Modificar el evento del botón de empezar
+        document.getElementById('boton-empezar').addEventListener('click', function() {
+            const nombre = document.getElementById('nombre-jugador').value.trim();
+            if (nombre) {
+                // Guardar el nombre del jugador
+                localStorage.setItem('nombreJugador', nombre);
+                // Intentar cargar el estado guardado
+                if (!cargarEstadoJuego()) {
+                    iniciarJuego();
+                }
+            } else {
+                alert('Por favor, introduce tu nombre');
+            }
+        });
+
+        // Modificar la función iniciarJuego
+        function iniciarJuego() {
+            errores = 0;
+            const palabraRandom = palabraAleatoria();
+            palabraActual = palabraRandom.palabra;
+            infoActual = palabraRandom.info;
+            mascara = Array(palabraActual.length).fill('');
+            letrasUsadas = [];
+            
+            document.getElementById('categoria-actual').textContent = palabraRandom.categoria;
+            document.getElementById('tarjeta-inicio').style.display = 'none';
+            document.getElementById('tarjeta-juego').style.display = 'block';
+            
+            actualizarAhorcado();
+            crearTeclado();
+            crearZonaPalabra();
+            
+            // Guardar el estado inicial
+            guardarEstadoJuego();
+        }
+
+        // Cargar el nombre del jugador al iniciar la página
+        window.onload = function() {
+            const nombreGuardado = localStorage.getItem('nombreJugador');
+            if (nombreGuardado) {
+                document.getElementById('nombre-jugador').value = nombreGuardado;
+                // Intentar cargar el estado guardado automáticamente
+                cargarEstadoJuego();
+            }
+        };
+    </script>
+</body>
+</html>
